@@ -25,79 +25,75 @@ float operator* (Vec6f param1, Vec6f param2)
  * \param srcRight :rectified image from right camera(target image)
  * \param disparityMap :computed disparity image
  * \param algorithmType :the algorithm used to compute the disparity map
+ * \param minDisparity :minmium disparity value
+ * \param numDisparity :number discrete disparities(Disparity Space Image)
  */
-void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, StereoMatchingAlgorithms algorithmType)
+void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, 
+	StereoMatchingAlgorithms algorithmType, int winSize, int minDisparity, int numDisparity)
 {
 	switch (algorithmType)
 	{
 	case BM:
-		getDisparity_BM(srcLeft, srcRight, disparityMap);
+		getDisparity_BM(srcLeft, srcRight, disparityMap, winSize, minDisparity, numDisparity);
 		break;
 	case SGBM:
-		getDisparity_SGBM(srcLeft, srcRight, disparityMap);
+		getDisparity_SGBM(srcLeft, srcRight, disparityMap, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT:
-		disparityMap = computeAdaptiveWeight(srcLeft, srcRight, 30, 20, DISPARITY_LEFT, 15, 0, 64);
+		disparityMap = computeAdaptiveWeight(srcLeft, srcRight, 30, 20, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_8DIRECT:
-		disparityMap = computeAdaptiveWeight_direct8(srcLeft, srcRight, DISPARITY_LEFT, 35, 0, 64);
+		disparityMap = computeAdaptiveWeight_direct8(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GEODESIC:
-		disparityMap = computeAdaptiveWeight_geodesic(srcLeft, srcRight, DISPARITY_LEFT, 15, 0, 64);
+		disparityMap = computeAdaptiveWeight_geodesic(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_BILATERAL_GRID:
-		disparityMap = computeAdaptiveWeight_bilateralGrid(srcLeft, srcRight, DISPARITY_LEFT, 10, 10, 0, 64);
+		disparityMap = computeAdaptiveWeight_bilateralGrid(srcLeft, srcRight, DISPARITY_LEFT, 10, 10, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_BLO1:
-		disparityMap = computeAdaptiveWeight_BLO1(srcLeft, srcRight, DISPARITY_LEFT, 0.015, 35, 0, 64);
+		disparityMap = computeAdaptiveWeight_BLO1(srcLeft, srcRight, DISPARITY_LEFT, 0.015, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER:
-		disparityMap = computeAdaptiveWeight_GuidedF(srcLeft, srcRight, DISPARITY_LEFT, 0.01, 15, 0, 64);
+		disparityMap = computeAdaptiveWeight_GuidedF(srcLeft, srcRight, DISPARITY_LEFT, 0.01, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_2:
-		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, DISPARITY_LEFT, 0.01, 13, 10, 150);
+		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, DISPARITY_LEFT, 0.01, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_3:
-		disparityMap = computeAdaptiveWeight_GuidedF_3(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, 15, 0, 64);
+		disparityMap = computeAdaptiveWeight_GuidedF_3(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_MEDIAN:
-		disparityMap = computeAdaptiveWeight_WeightedMedian(srcLeft, srcRight, DISPARITY_LEFT, 15, 10, 10, 0, 64);
+		disparityMap = computeAdaptiveWeight_WeightedMedian(srcLeft, srcRight, DISPARITY_LEFT, winSize, 10, 10, minDisparity, numDisparity);
 	}
 }
 
 /**
  * \brief compute the disparity map from a pair of images captured by left and right cameras,which are rectified
  *			\notice:the left and right image should be the same type and size,
- *					and the type of the images should be 8-bit single-channel image.
+ *					and the type of the images should be 8-bit \single_channel image.
  *			BM algorithm
  *			the higher disparity means the point in the world coordination is closer to the camera optical center
  * \param srcLeft :rectified left image(reference)
  * \param srcRight :rectified right image(target)
  * \param disparityMap :output disparity map
  */
-void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap)
+void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
+	int winSize, int minDisparity, int numDisparity)
 {
-	int ndisparities = 16 * 9;   /**< Range of disparity */
-	int SADWindowSize = 35; /**< Size of the block window. Must be odd */
-	Ptr<StereoBM> sbm = StereoBM::create(ndisparities, SADWindowSize);
-	sbm->setMinDisparity(186);			//确定匹配搜索从哪里开始，默认为0
-										//sbm->setNumDisparities(64);		//在该数值确定的视差范围内进行搜索，视差窗口
-										//即，最大视差值与最小视差值之差，大小必须为16的整数倍
-	sbm->setTextureThreshold(10);		//保证有足够的纹理以克服噪声
-	sbm->setDisp12MaxDiff(-1);			//左视差图（直接计算得出）和右视差图（通过cvValidateDisparity计算得出）之间的最大容许差异，默认为-1
-	sbm->setPreFilterCap(31);			//
-	sbm->setUniquenessRatio(25);		//使用匹配功能模式
-	sbm->setSpeckleRange(32);			//视差变化阈值，当窗口内视差变化大于阈值时，该窗口内的视差清零
-	sbm->setSpeckleWindowSize(0);		//检查视差连通区域变化度的窗口大小，值为0时取消speckle检查
+	if (numDisparity % 16 != 0)
+	{
+		CV_Error(cv::Error::StsBadArg, "the number of discrete disparities is supposed to be a multiple of 16.");
+	}
 
-	Mat imgDisparity16S = Mat(srcLeft.rows, srcLeft.cols, CV_16S);
-	Mat imgDisparity8U = Mat(srcLeft.rows, srcLeft.cols, CV_8UC1);
-	Mat Mask;
+	if (winSize % 2 == 0)
+	{
+		CV_Error(cv::Error::StsBadArg, "the window size is supposed to be an odd integer.");
+	}
 
 	if (srcLeft.empty() || srcRight.empty())
 	{
-		std::cout << " --(!) Error reading images " << std::endl;
-		return;
+		CV_Error(cv::Error::StsBadArg, "one of the input images is empty.");
 	}
 
 	if (srcLeft.type() != CV_8UC1)
@@ -112,15 +108,18 @@ void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap)
 		srcRight.convertTo(srcRight, CV_8UC1);
 	}
 
-	sbm->compute(srcLeft, srcRight, imgDisparity16S);
+	Ptr<StereoBM> sbm = StereoBM::create(numDisparity, winSize);
+	sbm->setMinDisparity(minDisparity);			//确定匹配搜索从哪里开始，默认为0
+										//sbm->setNumDisparities(64);		//在该数值确定的视差范围内进行搜索，视差窗口
+										//即，最大视差值与最小视差值之差，大小必须为16的整数倍
+	sbm->setTextureThreshold(10);		//保证有足够的纹理以克服噪声
+	sbm->setDisp12MaxDiff(1);			//左视差图（直接计算得出）和右视差图（通过cvValidateDisparity计算得出）之间的最大容许差异，默认为-1，左右一致性检测
+	sbm->setPreFilterCap(31);			//
+	sbm->setUniquenessRatio(25);		//使用匹配功能模式
+	sbm->setSpeckleRange(32);			//视差变化阈值，当窗口内视差变化大于阈值时，该窗口内的视差清零
+	sbm->setSpeckleWindowSize(0);		//检查视差连通区域变化度的窗口大小，值为0时取消speckle检查
 
-	imgDisparity16S.convertTo(imgDisparity8U, CV_8UC1, 255.0 / 1000.0);
-	//cv::compare(imgDisparity16S, 0, Mask, CMP_GE);
-	//cvtGreyToBGR(imgDisparity8U, imgDisparity8U);
-	//Mat disparityShow;
-	//imgDisparity8U.copyTo(disparityShow, Mask);
-
-	disparityMap = imgDisparity16S.clone();
+	sbm->compute(srcLeft, srcRight, disparityMap);
 }
 
 /**
@@ -133,32 +132,42 @@ void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap)
  * \param srcRight :rectified right image(target)
  * \param disparityMap :output disparity map
  */
-void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap)
+void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
+	int winSize, int minDisparity, int numDisparity)
 {
-	Ptr<StereoSGBM> sgbm = StereoSGBM::create(186, 16 * 9, 7,
-		8 * 3 * 7 * 7,
-		32 * 3 * 7 * 7,
-		200, 10, 10, 175, 2, StereoSGBM::MODE_SGBM_3WAY);
+	if(numDisparity % 16 != 0)
+	{
+		CV_Error(cv::Error::StsBadArg, "the number of discrete disparities is supposed to be a multiple of 16.");
+	}
+
+	if(winSize % 2 == 0)
+	{
+		CV_Error(cv::Error::StsBadArg, "the window size is supposed to be an odd integer.");
+	}
 
 	if (srcLeft.empty() || srcRight.empty())
 	{
-		std::cout << " --(!) Error reading images " << std::endl;
-		return;
+		CV_Error(cv::Error::StsBadArg, "one of the input images is empty.");
 	}
 
+	Ptr<StereoSGBM> sgbm = StereoSGBM::create(minDisparity, numDisparity, 7);
+	sgbm->setPreFilterCap(31);
+	int sgbmWinSize = winSize > 0 ? winSize : 3;
+	sgbm->setBlockSize(sgbmWinSize);
+	int cn = srcLeft.channels();
+	sgbm->setP1(8 * cn * sgbmWinSize * sgbmWinSize);
+	sgbm->setP2(32 * cn * sgbmWinSize * sgbmWinSize);
+	sgbm->setMinDisparity(minDisparity);
+	sgbm->setNumDisparities(numDisparity);
+	sgbm->setUniquenessRatio(10);
+	sgbm->setSpeckleWindowSize(100);
+	sgbm->setSpeckleRange(32);
+	sgbm->setDisp12MaxDiff(1);					//left-right consistency check
+	sgbm->setMode(StereoSGBM::MODE_SGBM);
+
 	Mat sgbmDisp16S = Mat(srcLeft.rows, srcLeft.cols, CV_16S);
-	Mat sgbmDisp8U = Mat(srcLeft.rows, srcLeft.cols, CV_8UC1);
-	Mat Mask;
-
 	sgbm->compute(srcLeft, srcRight, sgbmDisp16S);
-
-	//sgbmDisp16S.convertTo(sgbmDisp8U, CV_8UC1, 255.0 / 1000.0);
-	//cv::compare(sgbmDisp16S, 0, Mask, CMP_GE);
-	//cvtGreyToBGR(sgbmDisp8U, sgbmDisp8U);
-	//Mat sgbmDisparityShow;
-	//sgbmDisp8U.copyTo(sgbmDisparityShow, Mask);
-
-	disparityMap = sgbmDisp16S.clone();
+	sgbmDisp16S.convertTo(disparityMap, CV_8U, 1.0 / 16);		//除以16得到真实视差值
 }
 
 //----------------------------------------------------

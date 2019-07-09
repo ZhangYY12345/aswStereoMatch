@@ -89,9 +89,9 @@ struct MY_COMP_vec4i
 //--------disparity computation--------
 //-------------------------------------
 void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
-	StereoMatchingAlgorithms algorithmType);
-void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap);
-void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap);
+	StereoMatchingAlgorithms algorithmType, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
+void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
+void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
 
 
 //-------------------------------------
