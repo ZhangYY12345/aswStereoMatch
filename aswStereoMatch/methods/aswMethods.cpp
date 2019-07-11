@@ -4,6 +4,21 @@
 using namespace cv;
 using namespace std;
 
+std::map<StereoMatchingAlgorithms, std::string> algorithmFlags = {
+	{BM, "BM"},
+	{SGBM, "SGBM"},
+	{NCC, "NCC"},
+	{ADAPTIVE_WEIGHT, "ADAPTIVE_WEIGHT"},
+	{ADAPTIVE_WEIGHT_8DIRECT, "ADAPTIVE_WEIGHT_8DIRECT"},
+	{ADAPTIVE_WEIGHT_GEODESIC, "ADAPTIVE_WEIGHT_GEODESIC"},
+	//{ADAPTIVE_WEIGHT_BILATERAL_GRID, "ADAPTIVE_WEIGHT_BILATERAL_GRID"},
+	{ADAPTIVE_WEIGHT_BLO1, "ADAPTIVE_WEIGHT_BLO1"},
+	{ADAPTIVE_WEIGHT_GUIDED_FILTER, "ADAPTIVE_WEIGHT_GUIDED_FILTER"},
+	{ADAPTIVE_WEIGHT_GUIDED_FILTER_2, "ADAPTIVE_WEIGHT_GUIDED_FILTER_2"},
+	//{ADAPTIVE_WEIGHT_GUIDED_FILTER_3, "ADAPTIVE_WEIGHT_GUIDED_FILTER_3"},
+	{ADAPTIVE_WEIGHT_MEDIAN, "ADAPTIVE_WEIGHT_MEDIAN"},
+};
+
 float operator* (Vec3f param1, Vec3f param2)
 {
 	return param1[0] * param2[0] + param1[1] * param2[1] + param1[2] * param2[2];
@@ -58,13 +73,17 @@ void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 		disparityMap = computeAdaptiveWeight_GuidedF(srcLeft, srcRight, DISPARITY_LEFT, 0.01, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_2:
-		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, DISPARITY_LEFT, 0.01, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_3:
 		disparityMap = computeAdaptiveWeight_GuidedF_3(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_MEDIAN:
 		disparityMap = computeAdaptiveWeight_WeightedMedian(srcLeft, srcRight, DISPARITY_LEFT, winSize, 10, 10, minDisparity, numDisparity);
+		break;
+	case NCC:
+		disparityMap = computeNCC(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
+		break;
 	}
 }
 
@@ -98,13 +117,13 @@ void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 
 	if (srcLeft.type() != CV_8UC1)
 	{
-		cvtColor(srcLeft, srcLeft, CV_BGR2GRAY);
+		cvtColor(srcLeft, srcLeft, COLOR_BGR2GRAY);
 		srcLeft.convertTo(srcLeft, CV_8UC1);
 	}
 
 	if (srcRight.type() != CV_8UC1)
 	{
-		cvtColor(srcRight, srcRight, CV_BGR2GRAY);
+		cvtColor(srcRight, srcRight, COLOR_BGR2GRAY);
 		srcRight.convertTo(srcRight, CV_8UC1);
 	}
 
@@ -112,14 +131,18 @@ void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 	sbm->setMinDisparity(minDisparity);			//确定匹配搜索从哪里开始，默认为0
 										//sbm->setNumDisparities(64);		//在该数值确定的视差范围内进行搜索，视差窗口
 										//即，最大视差值与最小视差值之差，大小必须为16的整数倍
+	sbm->setNumDisparities(numDisparity);
 	sbm->setTextureThreshold(10);		//保证有足够的纹理以克服噪声
 	sbm->setDisp12MaxDiff(1);			//左视差图（直接计算得出）和右视差图（通过cvValidateDisparity计算得出）之间的最大容许差异，默认为-1，左右一致性检测
 	sbm->setPreFilterCap(31);			//
-	sbm->setUniquenessRatio(25);		//使用匹配功能模式
+	sbm->setUniquenessRatio(15);		//使用匹配功能模式
 	sbm->setSpeckleRange(32);			//视差变化阈值，当窗口内视差变化大于阈值时，该窗口内的视差清零
-	sbm->setSpeckleWindowSize(0);		//检查视差连通区域变化度的窗口大小，值为0时取消speckle检查
+	sbm->setSpeckleWindowSize(100);		//检查视差连通区域变化度的窗口大小，值为0时取消speckle检查
+	sbm->setBlockSize(winSize > 0 ? winSize : 9);
 
-	sbm->compute(srcLeft, srcRight, disparityMap);
+	Mat sbmDisp16S;
+	sbm->compute(srcLeft, srcRight, sbmDisp16S);
+	sbmDisp16S.convertTo(disparityMap, CV_8U, 1.0 / 16);		//除以16得到真实视差值
 }
 
 /**
@@ -150,11 +173,11 @@ void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 		CV_Error(cv::Error::StsBadArg, "one of the input images is empty.");
 	}
 
-	Ptr<StereoSGBM> sgbm = StereoSGBM::create(minDisparity, numDisparity, 7);
-	sgbm->setPreFilterCap(31);
 	int sgbmWinSize = winSize > 0 ? winSize : 3;
-	sgbm->setBlockSize(sgbmWinSize);
 	int cn = srcLeft.channels();
+	Ptr<StereoSGBM> sgbm = StereoSGBM::create(minDisparity, numDisparity, sgbmWinSize);
+	sgbm->setPreFilterCap(10);
+	sgbm->setBlockSize(sgbmWinSize);
 	sgbm->setP1(8 * cn * sgbmWinSize * sgbmWinSize);
 	sgbm->setP2(32 * cn * sgbmWinSize * sgbmWinSize);
 	sgbm->setMinDisparity(minDisparity);
@@ -163,9 +186,9 @@ void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 	sgbm->setSpeckleWindowSize(100);
 	sgbm->setSpeckleRange(32);
 	sgbm->setDisp12MaxDiff(1);					//left-right consistency check
-	sgbm->setMode(StereoSGBM::MODE_SGBM);
+	sgbm->setMode(StereoSGBM::MODE_SGBM_3WAY);
 
-	Mat sgbmDisp16S = Mat(srcLeft.rows, srcLeft.cols, CV_16S);
+	Mat sgbmDisp16S;
 	sgbm->compute(srcLeft, srcRight, sgbmDisp16S);
 	sgbmDisp16S.convertTo(disparityMap, CV_8U, 1.0 / 16);		//除以16得到真实视差值
 }
@@ -754,7 +777,7 @@ void getInputImgNCC(cv::Mat src, std::vector<std::vector<cv::Mat> > & dst, int w
 
 	if (src.channels() == 3)
 	{
-		cvtColor(src, src, CV_BGR2GRAY);
+		cvtColor(src, src, COLOR_BGR2GRAY);
 	}
 
 	Mat src_border;
@@ -807,12 +830,12 @@ cv::Mat computeNCC(cv::Mat leftImg, cv::Mat rightImg, DisparityType dispType, in
 
 	if (leftImg.channels() == 3)
 	{
-		cvtColor(leftImg, leftImg, CV_RGB2GRAY);
+		cvtColor(leftImg, leftImg, COLOR_RGB2GRAY);
 	}
 
 	if (rightImg.channels() == 3)
 	{
-		cvtColor(rightImg, rightImg, CV_RGB2GRAY);
+		cvtColor(rightImg, rightImg, COLOR_RGB2GRAY);
 	}
 
 	// calculate each pixel's ASW value
@@ -924,12 +947,12 @@ void computeNCC(cv::Mat leftImg, cv::Mat rightImg, std::vector<cv::Mat>& cost_ds
 
 	if (leftImg.channels() == 3)
 	{
-		cvtColor(leftImg, leftImg, CV_RGB2GRAY);
+		cvtColor(leftImg, leftImg, COLOR_RGB2GRAY);
 	}
 
 	if (rightImg.channels() == 3)
 	{
-		cvtColor(rightImg, rightImg, CV_RGB2GRAY);
+		cvtColor(rightImg, rightImg, COLOR_RGB2GRAY);
 	}
 
 	// calculate each pixel's NCC cost
@@ -1005,9 +1028,9 @@ cv::Mat computeAdaptiveWeight(cv::Mat leftImg, cv::Mat rightImg, double gamma_c,
 
 	//用灰度值表示颜色，用绝对灰度差值表示像素点的颜色距离
 	Mat left;
-	cvtColor(leftImg, left, CV_BGR2GRAY);
+	cvtColor(leftImg, left, COLOR_BGR2GRAY);
 	Mat right;
-	cvtColor(rightImg, right, CV_BGR2GRAY);
+	cvtColor(rightImg, right, COLOR_BGR2GRAY);
 
 	for (int i = 0; i < height; ++i)
 	{
@@ -1156,9 +1179,9 @@ cv::Mat computeAdaptiveWeight_direct8(cv::Mat leftImg, cv::Mat rightImg,
 
 	//用灰度值表示颜色，用绝对灰度差值表示像素点的颜色距离
 	Mat left;
-	cvtColor(leftImg, left, CV_BGR2GRAY);
+	cvtColor(leftImg, left, COLOR_BGR2GRAY);
 	Mat right;
-	cvtColor(rightImg, right, CV_BGR2GRAY);
+	cvtColor(rightImg, right, COLOR_BGR2GRAY);
 
 	for (int i = 0; i < height; ++i)
 	{
@@ -2246,11 +2269,11 @@ cv::Mat computeAdaptiveWeight_bilateralGrid(cv::Mat leftImg, cv::Mat rightImg, D
 
 	if (leftImg.channels() == 3)
 	{
-		cvtColor(leftImg, leftImg, CV_BGR2GRAY);
+		cvtColor(leftImg, leftImg, COLOR_BGR2GRAY);
 	}
 	if (rightImg.channels() == 3)
 	{
-		cvtColor(rightImg, rightImg, CV_BGR2GRAY);
+		cvtColor(rightImg, rightImg, COLOR_BGR2GRAY);
 	}
 
 	for (int offset = min_offset; offset <= max_offset; offset++)
@@ -2422,13 +2445,13 @@ cv::Mat getCostSAD_d(cv::Mat leftImg, cv::Mat rightImg, int disparity, Disparity
 
 	if (leftImg.channels() != 1 || leftImg.depth() == CV_32S)
 	{
-		cvtColor(leftImg, leftImg, CV_BGR2GRAY);
+		cvtColor(leftImg, leftImg, COLOR_BGR2GRAY);
 		leftImg.convertTo(leftImg, CV_8UC1);
 	}
 
 	if (rightImg.channels() != 1 || rightImg.depth() == CV_32S)
 	{
-		cvtColor(rightImg, rightImg, CV_BGR2GRAY);
+		cvtColor(rightImg, rightImg, COLOR_BGR2GRAY);
 		rightImg.convertTo(rightImg, CV_8UC1);
 	}
 
@@ -2490,11 +2513,11 @@ cv::Mat computeAdaptiveWeight_BLO1(cv::Mat leftImg, cv::Mat rightImg, DisparityT
 
 	if (leftImg.channels() == 3)
 	{
-		cvtColor(leftImg, leftImg, CV_BGR2GRAY);
+		cvtColor(leftImg, leftImg, COLOR_BGR2GRAY);
 	}
 	if (rightImg.channels() == 3)
 	{
-		cvtColor(rightImg, rightImg, CV_BGR2GRAY);
+		cvtColor(rightImg, rightImg, COLOR_BGR2GRAY);
 	}
 
 	Mat  leftImg_border, rightImg_border;

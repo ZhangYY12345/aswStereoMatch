@@ -20,6 +20,7 @@ enum StereoMatchingAlgorithms
 	ADAPTIVE_WEIGHT_GUIDED_FILTER_2 = 8,
 	ADAPTIVE_WEIGHT_GUIDED_FILTER_3 = 9,
 	ADAPTIVE_WEIGHT_MEDIAN = 10,
+	NCC = 11,
 };
 
 enum PCLFILTERS_
@@ -39,6 +40,7 @@ enum CONSENSUS_MODEL_TYPE_
 	CONSENSUS_MODEL_SPHERE_ = 0,
 	CONSENSUS_MODEL_PLANE_ = 1,
 };
+
 
 bool check_image(const cv::Mat &image, std::string name = "Image");
 bool check_dimensions(const cv::Mat &img1, const cv::Mat &img2);
