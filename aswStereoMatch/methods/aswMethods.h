@@ -88,7 +88,7 @@ struct MY_COMP_vec4i
 //-------------------------------------
 //--------disparity computation--------
 //-------------------------------------
-void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
+void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, DisparityType disparityType,
 	StereoMatchingAlgorithms algorithmType, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
 void getDisparity_BM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
 void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, int winSize = 15, int minDisparity = 0, int numDisparity = 64);
@@ -165,7 +165,7 @@ cv::Mat computeAdaptiveWeight_BLO1(cv::Mat leftImg, cv::Mat rightImg,
 //guided filter based asw
 cv::Mat multiChl_to_oneChl_mul(cv::Mat firstImg, cv::Mat secondImg);
 cv::Mat getGuidedFilter(cv::Mat guidedImg, cv::Mat inputP, int r, double eps);
-cv::Mat computeAdaptiveWeight_GuidedF(cv::Mat leftImg, cv::Mat rightImg,
+cv::Mat computeAdaptiveWeight_GuidedF(cv::Mat leftImg, cv::Mat rightImg, 
 	DisparityType dispType = DISPARITY_LEFT, double eps = 1e-8, int winSize = 35,
 	int minDisparity = 186, int numDisparity = 144);
 cv::Mat computeAdaptiveWeight_GuidedF_2(cv::Mat leftImg, cv::Mat rightImg,

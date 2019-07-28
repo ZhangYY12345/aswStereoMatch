@@ -5,18 +5,18 @@ using namespace cv;
 using namespace std;
 
 std::map<StereoMatchingAlgorithms, std::string> algorithmFlags = {
-	{BM, "BM"},
-	{SGBM, "SGBM"},
-	{NCC, "NCC"},
-	{ADAPTIVE_WEIGHT, "ADAPTIVE_WEIGHT"},
-	{ADAPTIVE_WEIGHT_8DIRECT, "ADAPTIVE_WEIGHT_8DIRECT"},
-	{ADAPTIVE_WEIGHT_GEODESIC, "ADAPTIVE_WEIGHT_GEODESIC"},
+	//{BM, "BM"},
+	//{SGBM, "SGBM"},
+	//{NCC, "NCC"},
+	//{ADAPTIVE_WEIGHT, "ADAPTIVE_WEIGHT"},
+	//{ADAPTIVE_WEIGHT_8DIRECT, "ADAPTIVE_WEIGHT_8DIRECT"},
+	//{ADAPTIVE_WEIGHT_GEODESIC, "ADAPTIVE_WEIGHT_GEODESIC"},
 	//{ADAPTIVE_WEIGHT_BILATERAL_GRID, "ADAPTIVE_WEIGHT_BILATERAL_GRID"},
-	{ADAPTIVE_WEIGHT_BLO1, "ADAPTIVE_WEIGHT_BLO1"},
-	{ADAPTIVE_WEIGHT_GUIDED_FILTER, "ADAPTIVE_WEIGHT_GUIDED_FILTER"},
+	//{ADAPTIVE_WEIGHT_BLO1, "ADAPTIVE_WEIGHT_BLO1"},
+	//{ADAPTIVE_WEIGHT_GUIDED_FILTER, "ADAPTIVE_WEIGHT_GUIDED_FILTER"},
 	{ADAPTIVE_WEIGHT_GUIDED_FILTER_2, "ADAPTIVE_WEIGHT_GUIDED_FILTER_2"},
 	//{ADAPTIVE_WEIGHT_GUIDED_FILTER_3, "ADAPTIVE_WEIGHT_GUIDED_FILTER_3"},
-	{ADAPTIVE_WEIGHT_MEDIAN, "ADAPTIVE_WEIGHT_MEDIAN"},
+	//{ADAPTIVE_WEIGHT_MEDIAN, "ADAPTIVE_WEIGHT_MEDIAN"},
 };
 
 float operator* (Vec3f param1, Vec3f param2)
@@ -43,7 +43,7 @@ float operator* (Vec6f param1, Vec6f param2)
  * \param minDisparity :minmium disparity value
  * \param numDisparity :number discrete disparities(Disparity Space Image)
  */
-void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, 
+void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap, DisparityType disparityType,
 	StereoMatchingAlgorithms algorithmType, int winSize, int minDisparity, int numDisparity)
 {
 	switch (algorithmType)
@@ -55,34 +55,34 @@ void stereoMatching(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 		getDisparity_SGBM(srcLeft, srcRight, disparityMap, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT:
-		disparityMap = computeAdaptiveWeight(srcLeft, srcRight, 30, 20, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight(srcLeft, srcRight, 30, 20, disparityType, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_8DIRECT:
-		disparityMap = computeAdaptiveWeight_direct8(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_direct8(srcLeft, srcRight, disparityType, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GEODESIC:
-		disparityMap = computeAdaptiveWeight_geodesic(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_geodesic(srcLeft, srcRight, disparityType, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_BILATERAL_GRID:
-		disparityMap = computeAdaptiveWeight_bilateralGrid(srcLeft, srcRight, DISPARITY_LEFT, 10, 10, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_bilateralGrid(srcLeft, srcRight, disparityType, 10, 10, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_BLO1:
-		disparityMap = computeAdaptiveWeight_BLO1(srcLeft, srcRight, DISPARITY_LEFT, 0.015, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_BLO1(srcLeft, srcRight, disparityType, 0.015, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER:
-		disparityMap = computeAdaptiveWeight_GuidedF(srcLeft, srcRight, DISPARITY_LEFT, 0.01, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_GuidedF(srcLeft, srcRight, disparityType, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_2:
-		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_GuidedF_2(srcLeft, srcRight, disparityType, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_GUIDED_FILTER_3:
-		disparityMap = computeAdaptiveWeight_GuidedF_3(srcLeft, srcRight, DISPARITY_LEFT, 1e-6, winSize, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_GuidedF_3(srcLeft, srcRight, disparityType, 1e-6, winSize, minDisparity, numDisparity);
 		break;
 	case ADAPTIVE_WEIGHT_MEDIAN:
-		disparityMap = computeAdaptiveWeight_WeightedMedian(srcLeft, srcRight, DISPARITY_LEFT, winSize, 10, 10, minDisparity, numDisparity);
+		disparityMap = computeAdaptiveWeight_WeightedMedian(srcLeft, srcRight, disparityType, winSize, 10, 10, minDisparity, numDisparity);
 		break;
 	case NCC:
-		disparityMap = computeNCC(srcLeft, srcRight, DISPARITY_LEFT, winSize, minDisparity, numDisparity);
+		disparityMap = computeNCC(srcLeft, srcRight, disparityType, winSize, minDisparity, numDisparity);
 		break;
 	}
 }
@@ -183,9 +183,9 @@ void getDisparity_SGBM(cv::Mat srcLeft, cv::Mat srcRight, cv::Mat& disparityMap,
 	sgbm->setMinDisparity(minDisparity);
 	sgbm->setNumDisparities(numDisparity);
 	sgbm->setUniquenessRatio(10);
-	sgbm->setSpeckleWindowSize(100);
+	sgbm->setSpeckleWindowSize(175);
 	sgbm->setSpeckleRange(32);
-	sgbm->setDisp12MaxDiff(1);					//left-right consistency check
+	sgbm->setDisp12MaxDiff(200);					//left-right consistency check
 	sgbm->setMode(StereoSGBM::MODE_SGBM_3WAY);
 
 	Mat sgbmDisp16S;
@@ -2814,8 +2814,36 @@ cv::Mat getGuidedFilter(cv::Mat guidedImg, cv::Mat inputP, int r, double eps)
 	Mat covGuidP;
 	covGuidP = corrGuidP - meanGuidmulP;
 
-	Mat a = covGuidP / (varGuid + (varGuid / varGuid) * eps);
+	//create image mask for matrix adding integer
+	Mat onesMat = Mat::ones(varGuid.size(), varGuid.depth());
+	Mat mergeOnes;
+	if(varGuid.channels() == 1)
+	{
+		mergeOnes = onesMat;
+	}
+	else if(varGuid.channels() == 3)
+	{
+		vector<Mat> oneChannel;
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
 
+		merge(oneChannel, mergeOnes);
+	}
+	else if(varGuid.channels() == 6)
+	{
+		vector<Mat> oneChannel;
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+		oneChannel.push_back(onesMat);
+
+		merge(oneChannel, mergeOnes);
+	}
+
+	Mat a = covGuidP / (varGuid + mergeOnes * eps);
 	Mat b = meanP - multiChl_to_oneChl_mul(a, meanGuid);
 
 	boxFilter(a, a, CV_32F, Size(r, r));
