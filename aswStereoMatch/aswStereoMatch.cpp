@@ -29,16 +29,64 @@ int main()
 
 		resize(stereoPair_rectified_left, stereoPair_rectified_left, Size(640, 360));
 		resize(stereoPair_rectified_right, stereoPair_rectified_right, Size(640, 360));
+		////edge detection
+		//{
+		//	Mat sobelL_x, sobelL_y, sobelR_x, sobelR_y;
+		//	Sobel(stereoPair_rectified_left, sobelL_x, CV_32F, 1, 0, 3, 1, 0, BORDER_REFLECT);
+		//	Sobel(stereoPair_rectified_left, sobelL_y, CV_32F, 0, 1, 3, 1, 0, BORDER_REFLECT);
+		//	Mat gradientL;
+		//	cv::sqrt(sobelL_x.mul(sobelL_x) + sobelL_y.mul(sobelL_y), gradientL);
+		//	gradientL.convertTo(gradientL, CV_8U);
 
-		Mat sobelL_x, sobelL_y, sobelR_x, sobelR_y;
-		Sobel(stereoPair_rectified_left, sobelL_x, CV_8U, 1, 0, 3, 1, 0, BORDER_REFLECT);
-		Sobel(stereoPair_rectified_left, sobelL_y, CV_8U, 0, 1, 3, 1, 0, BORDER_REFLECT);
+		//	Sobel(stereoPair_rectified_right, sobelR_x, CV_32F, 1, 0, 3, 1, 0, BORDER_REFLECT);
+		//	Sobel(stereoPair_rectified_right, sobelR_y, CV_32F, 0, 1, 3, 1, 0, BORDER_REFLECT);
+		//	Mat gradientR;
+		//	sqrt(sobelR_x.mul(sobelR_x) + sobelR_y.mul(sobelR_y), gradientR);
+		//	gradientR.convertTo(gradientR, CV_8U);
 
-		Sobel(stereoPair_rectified_right, sobelR_x, CV_8U, 1, 0, 3, 1, 0, BORDER_REFLECT);
-		Sobel(stereoPair_rectified_right, sobelR_y, CV_8U, 0, 1, 3, 1, 0, BORDER_REFLECT);
+		//	stereoPair_rectified_left = stereoPair_rectified_left + gradientL;
+		//	stereoPair_rectified_right = stereoPair_rectified_right + gradientR;
+		//}
 
-		stereoPair_rectified_left = stereoPair_rectified_left + sobelL_x + sobelL_y;
-		stereoPair_rectified_right = stereoPair_rectified_right + sobelR_x + sobelR_y;
+		////detail enhancement using gaussian filter
+		//{
+		//	Mat blurL, blurR;
+		//	GaussianBlur(stereoPair_rectified_left, blurL, Size(7, 7), 2, 2, BORDER_REFLECT);
+		//	GaussianBlur(stereoPair_rectified_right, blurR, Size(7, 7), 2, 2, BORDER_REFLECT);
+
+		//	Mat detailL, detailR;
+		//	detailL = stereoPair_rectified_left - blurL;
+		//	detailR = stereoPair_rectified_right - blurR;
+
+		//	stereoPair_rectified_left = stereoPair_rectified_left + detailL * 2;
+		//	stereoPair_rectified_right = stereoPair_rectified_right + detailR * 2;
+
+		//}
+
+		//detail enhancement using bilateral filter
+		{
+			Mat hsvL, hsvR;
+			cvtColor(stereoPair_rectified_left, hsvL, COLOR_BGR2HSV);
+			cvtColor(stereoPair_rectified_right, hsvR, COLOR_BGR2HSV);
+
+			std::vector<Mat> mat3cn;
+			split(hsvL, mat3cn);
+			Mat blurL, blurR;
+			bilateralFilter(mat3cn[2], blurL, 7, 10, 3, BORDER_REFLECT);
+			Mat detailL, detailR;
+			detailL = mat3cn[2] - blurL;
+			mat3cn[2] = mat3cn[2] + detailL * 2;
+			merge(mat3cn, hsvL);
+			cvtColor(hsvL, stereoPair_rectified_left, COLOR_HSV2BGR);
+
+			mat3cn.clear();
+			split(hsvR, mat3cn);
+			bilateralFilter(mat3cn[2], blurR, 7, 10, 3, BORDER_REFLECT);
+			detailR = mat3cn[2] - blurR;
+			mat3cn[2] = mat3cn[2] + detailR * 2;
+			merge(mat3cn, hsvR);
+			cvtColor(hsvR, stereoPair_rectified_right, COLOR_HSV2BGR);
+		}
 
 		for (auto itor = algorithmFlags.begin(); itor != algorithmFlags.end(); itor++)
 		{
